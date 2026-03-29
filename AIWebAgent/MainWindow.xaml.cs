@@ -14,7 +14,7 @@ namespace AIWebAgent
 {
     public partial class MainWindow : Window
     {
-        private const string GROQ_API_KEY = "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";
+        private const string GROQ_API_KEY = "GroqApiKey";
         private const string GROQ_MODEL = "llama-3.3-70b-versatile";
         private bool _isCloudMode = true;
         private IPlaywright _playwright;
