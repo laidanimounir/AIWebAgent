@@ -4,22 +4,32 @@ using System.Net.Http;
 using System.Text;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Input;
 using System.Windows.Media;
 using Microsoft.Web.WebView2.Core;
 using Microsoft.Playwright;
 using Newtonsoft.Json;
 using System.Collections.Generic;
 
-namespace AIWebAgent
+namespace AIWebAgent 
 {
     public partial class MainWindow : Window
     {
-        private const string GROQ_API_KEY = "GroqApiKey";
+        private static readonly string GROQ_API_KEY = System.Text.Json.JsonDocument
+      .Parse(File.ReadAllText(
+          Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "appsettings.json")))
+      .RootElement
+      .GetProperty("GroqApiKey")
+      .GetString();
         private const string GROQ_MODEL = "llama-3.3-70b-versatile";
         private bool _isCloudMode = true;
         private IPlaywright _playwright;
         private IBrowser _browser;
         private IPage _page;
+
+        
+        private List<object> _chatHistory = new List<object>();
+        private const int MAX_HISTORY = 5;
 
         public MainWindow()
         {
@@ -27,6 +37,13 @@ namespace AIWebAgent
             MainWebView.CoreWebView2InitializationCompleted += MainWebView_CoreWebView2InitializationCompleted;
             InitializeBrowserAsync();
             _ = InitializePlaywrightAsync();
+
+            
+            CommandInput.KeyDown += (s, e) =>
+            {
+                if (e.Key == Key.Enter)
+                    SendCommand_Click(s, e);
+            };
         }
 
         private async void InitializeBrowserAsync()
@@ -99,6 +116,9 @@ namespace AIWebAgent
             AddMessage(userMessage, isUser: true);
             CommandInput.Clear();
 
+         
+            _chatHistory.Add(new { role = "user", content = userMessage });
+
             try
             {
                 SetStatus("🟡 جاري قراءة الصفحة...");
@@ -113,6 +133,12 @@ namespace AIWebAgent
                     response = await AskGroqAsync(userMessage, pageTitle, pageContent);
                 else
                     response = await AskOllamaAsync(userMessage, pageTitle, pageContent);
+
+                
+                _chatHistory.Add(new { role = "assistant", content = response });
+
+                if (_chatHistory.Count > MAX_HISTORY * 2)
+                    _chatHistory.RemoveRange(0, 2);
 
                 AddMessage(response, isUser: false);
                 SetStatus("🟢 جاهز");
@@ -129,7 +155,10 @@ namespace AIWebAgent
             using var client = new HttpClient();
             client.DefaultRequestHeaders.Add("Authorization", $"Bearer {GROQ_API_KEY}");
 
-            string systemPrompt = @"أنت وكيل ذكي مدمج في متصفح ويب.
+            string systemPrompt = $@"أنت وكيل ذكي مدمج في متصفح ويب.
+الصفحة الحالية: {pageTitle}
+محتوى الصفحة: {pageContent.Substring(0, Math.Min(500, pageContent.Length))}
+
 عندما يطلب المستخدم فتح موقع معين، رد بهذا التنسيق فقط:
 ACTION:NAVIGATE:https://www.example.com
 عندما يطلب المستخدم البحث عن شيء، رد بهذا التنسيق فقط:
@@ -140,17 +169,17 @@ ACTION:REPLY:ردك هنا باللغة العربية
 - لا تضيف أي كلام قبل أو بعد سطر ACTION
 - الرد يجب أن يبدأ دائماً بـ ACTION:
 - إذا طلب المستخدم يوتيوب، استخدم https://www.youtube.com
-- إذا طلب المستخدم جوجل، استخدم https://www.google.com
-- الصفحة الحالية عنوانها: " + pageTitle;
+- إذا طلب المستخدم جوجل، استخدم https://www.google.com";
+
+            // بناء الرسائل مع التاريخ
+            var messages = new List<object>();
+            messages.Add(new { role = "system", content = systemPrompt });
+            messages.AddRange(_chatHistory);
 
             var requestBody = new
             {
                 model = GROQ_MODEL,
-                messages = new[]
-                {
-                    new { role = "system", content = systemPrompt },
-                    new { role = "user", content = userMessage }
-                },
+                messages = messages,
                 max_tokens = 300
             };
 
@@ -177,6 +206,7 @@ ACTION:REPLY:ردك هنا باللغة العربية
             string systemPrompt = $@"أنت وكيل ذكي مدمج في متصفح ويب.
 الصفحة الحالية: {pageTitle}
 محتوى الصفحة: {pageContent.Substring(0, Math.Min(500, pageContent.Length))}
+
 عندما يطلب المستخدم فتح موقع، رد بهذا التنسيق فقط:
 ACTION:NAVIGATE:https://www.example.com
 عندما يطلب البحث:
@@ -185,15 +215,16 @@ ACTION:SEARCH:كلمة البحث
 ACTION:REPLY:ردك هنا
 لا تضيف أي كلام آخر غير سطر ACTION";
 
+            // بناء الرسائل مع التاريخ
+            var messages = new List<object>();
+            messages.Add(new { role = "system", content = systemPrompt });
+            messages.AddRange(_chatHistory);
+
             var requestBody = new
             {
                 model = "qwen3:4b",
                 stream = false,
-                messages = new[]
-                {
-                    new { role = "system", content = systemPrompt },
-                    new { role = "user", content = userMessage }
-                }
+                messages = messages
             };
 
             var json = JsonConvert.SerializeObject(requestBody);
@@ -270,6 +301,7 @@ ACTION:REPLY:ردك هنا
         private void ClearChat_Click(object sender, RoutedEventArgs e)
         {
             ChatMessages.Children.Clear();
+            _chatHistory.Clear();
             SetStatus("🟢 تم مسح المحادثة");
         }
 
