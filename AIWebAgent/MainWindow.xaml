@@ -12,14 +12,14 @@
 
      
         <StackPanel Grid.Row="0" Orientation="Horizontal" Background="#2D2D30">
-            <Button Content="🤖 إخفاء/إظهار" Width="140" Margin="10,5" Click="ToggleChat_Click" Background="#007ACC" Foreground="White" FontWeight="Bold"/>
+            <Button Content="🤖 إخفاء/show" Width="140" Margin="10,5" Click="ToggleChat_Click" Background="#007ACC" Foreground="White" FontWeight="Bold"/>
             <TextBox x:Name="UrlTextBox" Width="500" Margin="5" VerticalContentAlignment="Center" FontSize="14" Text="https://www.google.com"/>
             <Button Content="Go" Width="60" Margin="5" Click="Go_Click" Background="#555" Foreground="White"/>
            
             <ToggleButton x:Name="AiModeToggle" Width="140" Margin="10,5" 
                           Checked="AiModeToggle_Checked" Unchecked="AiModeToggle_Unchecked"
                           Background="#28A745" Foreground="White" FontWeight="Bold"
-                          Content="☁️ سحابي (Groq)"/>
+                          Content="☁️ cloud (Groq)"/>
         </StackPanel>
 
         
